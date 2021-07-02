@@ -8,9 +8,11 @@
      </head>
      <body>
       <h1>Spoilers:</h1>
-      <p><a href= {{ spoilersLinkEng }}>Worstgen: {{ spoilersNameEng }}</a></p>
-      <p><a href= {{ spoilersLink }}>Pirate-King: {{ spoilersName }}</a></p>
+      <p><a href= {{ spoilerLinkWG }}>Worstgen: {{ spoilerNameWG }} {{ isActiveWG }}</a></p>
+      <p><a href= {{ spoilerLinkPK }}>Pirate-King: {{ spoilerNamePK }} {{ isActivePK }}</a></p>
       <h1>Latest chapter:</h1>
       <a href={{ chapterLink }}>{{ chapterNumber }}: {{ chapterTitle }}</a>
+      <h1>Break: </h1>
+      <a>{{ currentBreak }}</a>
      </body>
     </html>
