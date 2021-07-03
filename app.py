@@ -4,7 +4,10 @@ from bs4 import BeautifulSoup
 from requests_html import HTMLSession
 from datetime import *
 import re
+import requests_cache
+import redis
 #TODO: Implement something like CacheControl to prevent many requests being made if the page is reloaded.
+requests_cache.install_cache(backend='redis', expire_after=300)
 app = Flask(__name__)
 
 
