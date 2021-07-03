@@ -37,9 +37,8 @@ def scrapeWorstGen():
     # Scrape the thread and use post count to tell if spoilers are up (no replies will be made until spoilers are up, usually)
     currentThread = requests.get(spoilerLink).text
     threadSoup = BeautifulSoup(currentThread, 'html.parser')
-    count = 0
-    for _ in threadSoup.find_all('div', {'class': {'message-cell message-cell--main'}}):
-        count += 1
+    posts = threadSoup.find_all('div', {'class': {'message-cell message-cell--main'}})
+    count = len(posts)
     if count > 1:
         if count < 20:
             isActive = "(ACTIVE, {0} POSTS)".format(count)
