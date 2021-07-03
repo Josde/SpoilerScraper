@@ -3,16 +3,17 @@ import requests_cache
 from bs4 import BeautifulSoup
 from flask import Flask, render_template
 from requests_html import HTMLSession
-
+from flask_caching import Cache
 #TODO: Implement something like CacheControl to prevent many requests being made if the page is reloaded.
 requests_cache.install_cache(backend='memory', expire_after=300)
+cache = Cache(config={'CACHE_TYPE': 'SimpleCache', 'CACHE_DEFAULT_TIMEOUT': 300})
 app = Flask(__name__)
-
-
+cache.init_app(app)
 
 
 
 @app.route('/')
+@cache.cached(timeout=300)
 def index():
     spoilerNameWG, spoilerLinkWG, isActiveWG = scrapeWorstGen()
     spoilerNamePK, spoilerLinkPK, isActivePK = scrapePirateKing()
