@@ -7,7 +7,8 @@ import re
 import requests_cache
 import redis
 #TODO: Implement something like CacheControl to prevent many requests being made if the page is reloaded.
-requests_cache.install_cache(backend='redis', expire_after=300)
+pool = redis.ConnectionPool(host=REDIS_URL, port=6379, db=0)
+requests_cache.install_cache(backend='redis', expire_after=300, connection_pool=pool)
 app = Flask(__name__)
 
 
