@@ -1,14 +1,11 @@
-from flask import Flask, render_template
 import requests
-from bs4 import BeautifulSoup
-from requests_html import HTMLSession
-from datetime import *
-import re
 import requests_cache
-import redis
+from bs4 import BeautifulSoup
+from flask import Flask, render_template
+from requests_html import HTMLSession
+
 #TODO: Implement something like CacheControl to prevent many requests being made if the page is reloaded.
-pool = redis.ConnectionPool(host=REDIS_URL, port=6379, db=0)
-requests_cache.install_cache(backend='redis', expire_after=300, connection_pool=pool)
+requests_cache.install_cache(backend='memory', expire_after=300)
 app = Flask(__name__)
 
 
@@ -40,7 +37,7 @@ def scrapeWorstGen():
     currentThread = requests.get(spoilerLink).text
     threadSoup = BeautifulSoup(currentThread, 'html.parser')
     count = 0
-    for post in threadSoup.find_all('div', {'class': {'message-cell message-cell--main'}}):
+    for _ in threadSoup.find_all('div', {'class': {'message-cell message-cell--main'}}):
         count += 1
     if count > 1:
         if count < 20:
