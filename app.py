@@ -83,18 +83,24 @@ def scrapeBreak(chapterNumber):
     soup = BeautifulSoup(source, 'html.parser')
     table = soup.find('table')
     table_body = table.find('tbody')
-    breakType = ""
-    isCurrentChapter = 0
-    #currentRow = 0 currently unused
-    for row in table_body.find_all('tr'):
+    breakType = "After Chapter {0}, there is ".format(chapterNumber)
+
+    currentRow = -1
+    rows = table_body.find_all('tr')
+    for i in range (0, len(rows)):
+        row = rows[i]
         cols = row.find_all('td')
         cols = [ele.text.strip() for ele in cols]
-        if isCurrentChapter:
-            breakType = cols[1]
-            break;
-        if isCurrentChapter == 0 and cols[1] == chapterNumber:
-            isCurrentChapter = 1
+        if cols[1] == chapterNumber:
+            currentRow = i
+        if currentRow != -1 and (i == currentRow+1 or i == currentRow+2):
+            text = cols[1]
+            if "Break" not in text:
+                text = "Chapter {0}".format(text)
+            if (i == currentRow+1):
+                breakType += text
+            else:
+                breakType += " and then {0}".format(text)
 
-    if "Break" not in breakType:
-        breakType = "NO BREAK NEXT WEEK"
+
     return breakType
