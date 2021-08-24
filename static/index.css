@@ -15,7 +15,7 @@ body {
 .center {
     background-color:rgba(255, 255, 255, 1);
     margin-top: auto;
-    box-shadow: 0px 10px 50px 3px #1b1b1b;
+    border: 2px solid #1b1b1b;
     display:flex;
     flex-direction:column;
     vertical-align:center;
