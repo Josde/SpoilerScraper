@@ -26,7 +26,10 @@ if __name__ == '__main__':
     app.run()
 
 def scrapeWorstGen():
-    source = requests.get('https://worstgen.alwaysdata.net/forum/forums/one-piece-spoilers.14/').text
+    try:
+        source = requests.get('https://worstgen.alwaysdata.net/forum/forums/one-piece-spoilers.14/', timeout=5.000).text
+    except requests.exceptions.Timeout:
+        return "Site down.", "", ""
     soup = BeautifulSoup(source, 'html.parser')
     for thread in soup.find_all('div', {'class': {'structItem-title'}}):
         threadTitle = thread.findChildren('a')[1]
@@ -50,7 +53,10 @@ def scrapeWorstGen():
     return spoilerName, spoilerLink, isActive
 
 def scrapePirateKing():
-    source = requests.get('https://www.pirate-king.es/foro/one-piece-manga-f3.html').text
+    try:
+        source = requests.get('https://www.pirate-king.es/foro/one-piece-manga-f3.html', timeout=5.000).text
+    except requests.exceptions.Timeout:
+        return "Site down.", "", ""
     soup = BeautifulSoup(source, 'html.parser')
     isActive = ""
     for thread in soup.find_all('a', {'class': 'topictitle'}):
@@ -77,12 +83,18 @@ def getChapter():
 
 def scrapeBreak(chapterNumber):
     # Break data from ClayStage
-    header = {'User-Agent': 'Mozilla/5.0'}
+    header = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3729.169 Safari/537.36'}
     session = HTMLSession()
     source = session.get('https://claystage.com/one-piece-chapter-release-schedule-for-2021', headers=header).text
     soup = BeautifulSoup(source, 'html.parser')
-    table = soup.find('table')
-    table_body = table.find('tbody')
+    try:
+        table = soup.find('table')
+        table_body = table.find('tbody')
+    except Exception:
+        print(soup)
+        breakType = "There was an error parsing break data."
+        return breakType
+
     breakType = "After Chapter {0}, there is ".format(chapterNumber)
 
     currentRow = -1
