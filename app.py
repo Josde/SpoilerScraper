@@ -1,3 +1,5 @@
+import traceback
+
 import requests
 import requests_cache
 from bs4 import BeautifulSoup
@@ -18,7 +20,10 @@ def index():
     spoilerNameWG, spoilerLinkWG, isActiveWG = scrapeWorstGen()
     spoilerNamePK, spoilerLinkPK, isActivePK = scrapePirateKing()
     chapterNumber, chapterTitle, chapterLink = getChapter()
-    currentBreak = scrapeBreak(chapterNumber[8:])
+    if (chapterNumber == "Error parsing chapter."):
+        currentBreak = "Error parsing break."
+    else:
+        currentBreak = scrapeBreak(chapterNumber[18:22])
     return render_template('index.html', **locals())
 
 
@@ -29,56 +34,72 @@ def scrapeWorstGen():
     try:
         source = requests.get('https://worstgen.alwaysdata.net/forum/forums/one-piece-spoilers.14/', timeout=5.000).text
     except requests.exceptions.Timeout:
+        print(traceback.format_exc())
         return "Site down.", "", ""
-    soup = BeautifulSoup(source, 'html.parser')
-    for thread in soup.find_all('div', {'class': {'structItem-title'}}):
-        threadTitle = thread.findChildren('a')[1]
-        if "Summaries" in threadTitle.text:
-            spoilerName = threadTitle.text
-            spoilerLink = threadTitle['href']
-            break;
-    # Scrape the thread and use post count to tell if spoilers are up (no replies will be made until spoilers are up, usually)
-    currentThread = requests.get(spoilerLink).text
-    threadSoup = BeautifulSoup(currentThread, 'html.parser')
-    posts = threadSoup.find_all('div', {'class': {'message-cell message-cell--main'}})
-    count = len(posts)
-    if count > 1:
-        if count < 20:
-            isActive = "(ACTIVE, {0} POSTS)".format(count)
+    try:
+        soup = BeautifulSoup(source, 'html.parser')
+        for thread in soup.find_all('div', {'class': {'structItem-title'}}):
+            threadTitle = thread.findChildren('a')[1]
+            if "Summaries" in threadTitle.text:
+                spoilerName = threadTitle.text
+                spoilerLink = threadTitle['href']
+                break;
+        # Scrape the thread and use post count to tell if spoilers are up (no replies will be made until spoilers are up, usually)
+        currentThread = requests.get(spoilerLink).text
+        threadSoup = BeautifulSoup(currentThread, 'html.parser')
+        posts = threadSoup.find_all('div', {'class': {'message-cell message-cell--main'}})
+        count = len(posts)
+        if count > 1:
+            if count < 20:
+                isActive = "(ACTIVE, {0} POSTS)".format(count)
+            else:
+                #TODO: If thread has more than 20 posts, we should recursively parse the next pages to get all posts. Too lazy for that rn.
+                isActive = "(ACTIVE, {0}+ POSTS)".format(count)
         else:
-            #TODO: If thread has more than 20 posts, we should recursively parse the next pages to get all posts. Too lazy for that rn.
-            isActive = "(ACTIVE, {0}+ POSTS)".format(count)
-    else:
-        isActive = "(INACTIVE)"
+            isActive = "(INACTIVE)"
+    except AttributeError: #BeautifulSoup element not found
+        print(traceback.format_exc())
+        return "Error parsing spoilers.", "", ""
     return spoilerName, spoilerLink, isActive
 
 def scrapePirateKing():
     try:
         source = requests.get('https://www.pirate-king.es/foro/one-piece-manga-f3.html', timeout=5.000).text
     except requests.exceptions.Timeout:
+        print(traceback.format_exc())
         return "Site down.", "", ""
-    soup = BeautifulSoup(source, 'html.parser')
-    isActive = ""
-    for thread in soup.find_all('a', {'class': 'topictitle'}):
-        if "Spoilers" in thread.text:
-            # Latest spoiler threads are always pinned; therefore the first thread with "spoilers" in title is the one for the current chapter.
-            spoilerLink = thread['href']
-            spoilerName = thread.text
-            break;
+    try:
+        soup = BeautifulSoup(source, 'html.parser')
+        isActive = ""
+        for thread in soup.find_all('a', {'class': 'topictitle'}):
+            if "Spoilers" in thread.text:
+                # Latest spoiler threads are always pinned; therefore the first thread with "spoilers" in title is the one for the current chapter.
+                spoilerLink = thread['href']
+                spoilerName = thread.text
+                break;
+    except AttributeError:
+        print(traceback.format_exc())
+        return "Error parsing spoilers.", "", ""
     #TODO: Figure out a way to parse if spoilers are up here. Since Redon is a moderator, the edit message doesn't show on his posts.
     return spoilerName, spoilerLink, isActive
 
 def getChapter():
     #TODO: Redirect to M+ when chapter is released officially.
-    source = requests.get('https://onepiecechapters.com/one-piece/').text
-    soup = BeautifulSoup(source, 'html.parser')
-    # Latest chapter is always at the top, therefore first box is the latest chapter.
-    chapter = soup.find('div', {'class': 'elementor-image-box-content'}).text
-    # IMPROVEMENT: I could use regex to split this, but this will work until we get to Chapter 10000, so whatever.
-    chapterNumber = chapter[0:12]
-    chapterTitle = chapter[12:]
-    chapterLinkDiv = soup.find('h5', {'class': 'elementor-image-box-title'}).findChildren('a')[0]
-    chapterLink = chapterLinkDiv['href']
+    try:
+        source = requests.get('https://onepiecechapters.com/mangas/5/one-piece', timeout=5.000).text
+    except requests.exceptions.Timeout:
+        return "Site down.", "", ""
+    try:
+        soup = BeautifulSoup(source, 'html.parser')
+        # Latest chapter is always at the top, therefore first box is the latest chapter.
+        chapter = soup.find('a', {'class': 'block border border-border bg-card mb-3 p-3 rounded'})
+        # IMPROVEMENT: I could use regex to split this, but this will work until we get to Chapter 10000, so whatever.
+        chapterNumber = chapter.findChild('div', {'class': 'text-lg font-bold'}).text
+        chapterTitle = chapter.findChild('div', {'class': 'text-gray-500'}).text
+        chapterLink = "https://onepiecechapters.com" + chapter['href']
+    except AttributeError:
+        print(traceback.format_exc())
+        return "Error parsing chapter.", "", ""
     return chapterNumber, chapterTitle, chapterLink
 
 def scrapeBreak(chapterNumber):
@@ -91,6 +112,7 @@ def scrapeBreak(chapterNumber):
         table = soup.find('table')
         table_body = table.find('tbody')
     except Exception:
+        print(traceback.format_exc())
         print(soup)
         breakType = "There was an error parsing break data."
         return breakType
