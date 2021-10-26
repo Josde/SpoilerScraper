@@ -2,28 +2,54 @@ import traceback
 
 import requests
 import requests_cache
+from sqlalchemy import orm
 from bs4 import BeautifulSoup
 from flask import Flask, render_template
 from requests_html import HTMLSession
 from flask_caching import Cache
+from flask_sqlalchemy import SQLAlchemy
+from flask_migrate import Migrate
+import os
+from dotenv import load_dotenv
+load_dotenv()
 #TODO: Implement something like CacheControl to prevent many requests being made if the page is reloaded.
 requests_cache.install_cache(backend='memory', expire_after=300)
 cache = Cache(config={'CACHE_TYPE': 'SimpleCache', 'CACHE_DEFAULT_TIMEOUT': 300})
 app = Flask(__name__)
 cache.init_app(app)
+app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL')
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+db = SQLAlchemy(app)
+migrate = Migrate(app, db)
 
+
+from models import Chapter
 
 
 @app.route('/')
 @cache.cached(timeout=300)
 def index():
-    spoilerNameWG, spoilerLinkWG, isActiveWG = scrapeWorstGen()
-    spoilerNamePK, spoilerLinkPK, isActivePK = scrapePirateKing()
-    chapterNumber, chapterTitle, chapterLink = getChapter()
-    if (chapterNumber == "Error parsing chapter."):
+    spoilerNameWG, spoilerLinkWG, isActiveWG, errorWG = scrapeWorstGen()
+    spoilerNamePK, spoilerLinkPK, isActivePK, errorPK = scrapePirateKing()
+    chapterNumber, chapterTitle, chapterLink, errorChapter = getChapter()
+
+    if (errorChapter != ""):
         currentBreak = "Error parsing break."
     else:
-        currentBreak = scrapeBreak(chapterNumber[18:22])
+        # TODO: Add error handling for the chapter number
+        chapterNumberInt = int(chapterNumber[18:22])
+        try:
+            dbChapter = Chapter.query.filter_by(id=1).first()
+            if (dbChapter.number != chapterNumberInt):
+                #TODO: Do telegram stuff here.
+                dbChapter.chapterNumber = chapterNumberInt
+                db.session.commit()
+        except orm.exc.NoResultFound:
+            dbChapter = Chapter(1, chapterNumber=chapterNumberInt, url=chapterLink)
+            db.session.add(dbChapter)
+            db.session.commit()
+
+        currentBreak = scrapeBreak(str(chapterNumberInt))
     return render_template('index.html', **locals())
 
 
@@ -31,11 +57,13 @@ if __name__ == '__main__':
     app.run()
 
 def scrapeWorstGen():
+    spoilerName = spoilerLink = isActive = error = ""
     try:
         source = requests.get('https://worstgen.alwaysdata.net/forum/forums/one-piece-spoilers.14/', timeout=5.000).text
     except requests.exceptions.Timeout:
         print(traceback.format_exc())
-        return "Site down.", "", ""
+        error = "Site down."
+        return spoilerName, spoilerLink, isActive, error
     try:
         soup = BeautifulSoup(source, 'html.parser')
         for thread in soup.find_all('div', {'class': {'structItem-title'}}):
@@ -59,15 +87,18 @@ def scrapeWorstGen():
             isActive = "(INACTIVE)"
     except AttributeError: #BeautifulSoup element not found
         print(traceback.format_exc())
-        return "Error parsing spoilers.", "", ""
-    return spoilerName, spoilerLink, isActive
+        error = "Error parsing spoilers."
+        return spoilerName, spoilerLink, isActive, error
+    return spoilerName, spoilerLink, isActive, error
 
 def scrapePirateKing():
+    spoilerName = spoilerLink = isActive = error = ""
     try:
         source = requests.get('https://www.pirate-king.es/foro/one-piece-manga-f3.html', timeout=5.000).text
     except requests.exceptions.Timeout:
         print(traceback.format_exc())
-        return "Site down.", "", ""
+        error = "Site down."
+        return spoilerName, spoilerLink, isActive, error
     try:
         soup = BeautifulSoup(source, 'html.parser')
         isActive = ""
@@ -79,16 +110,19 @@ def scrapePirateKing():
                 break;
     except AttributeError:
         print(traceback.format_exc())
-        return "Error parsing spoilers.", "", ""
+        error = "Error parsing spoilers."
+        return spoilerName, spoilerLink, isActive, error
     #TODO: Figure out a way to parse if spoilers are up here. Since Redon is a moderator, the edit message doesn't show on his posts.
-    return spoilerName, spoilerLink, isActive
+    return spoilerName, spoilerLink, isActive, error
 
 def getChapter():
+    chapterNumber = chapterTitle = chapterLink = error = ""
     #TODO: Redirect to M+ when chapter is released officially.
     try:
         source = requests.get('https://onepiecechapters.com/mangas/5/one-piece', timeout=5.000).text
     except requests.exceptions.Timeout:
-        return "Site down.", "", ""
+        error = "Site down."
+        return chapterNumber, chapterTitle, chapterLink, error
     try:
         soup = BeautifulSoup(source, 'html.parser')
         # Latest chapter is always at the top, therefore first box is the latest chapter.
@@ -99,8 +133,9 @@ def getChapter():
         chapterLink = "https://onepiecechapters.com" + chapter['href']
     except AttributeError:
         print(traceback.format_exc())
-        return "Error parsing chapter.", "", ""
-    return chapterNumber, chapterTitle, chapterLink
+        error = "Error parsing chapter."
+        return chapterNumber, chapterTitle, chapterLink, error
+    return chapterNumber, chapterTitle, chapterLink, error
 
 def scrapeBreak(chapterNumber):
     # Break data from ClayStage
