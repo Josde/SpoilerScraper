@@ -11,13 +11,14 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 import os
 from dotenv import load_dotenv
+import re
 load_dotenv()
 #TODO: Implement something like CacheControl to prevent many requests being made if the page is reloaded.
 requests_cache.install_cache(backend='memory', expire_after=300)
 cache = Cache(config={'CACHE_TYPE': 'SimpleCache', 'CACHE_DEFAULT_TIMEOUT': 300})
 app = Flask(__name__)
 cache.init_app(app)
-app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL')
+app.config['SQLALCHEMY_DATABASE_URI'] = re.sub(r'^postgres:', 'postgresql:', os.getenv('DATABASE_URL'))
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 migrate = Migrate(app, db)
@@ -41,7 +42,7 @@ def index():
         try:
             dbChapter = Chapter.query.filter_by(id=1).first()
             if (dbChapter.number != chapterNumberInt):
-                #TODO: Do telegram stuff here.
+                #TODO: Do mail stuff here.
                 dbChapter.chapterNumber = chapterNumberInt
                 db.session.commit()
         except orm.exc.NoResultFound:
