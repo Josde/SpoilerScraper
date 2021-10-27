@@ -1,0 +1,24 @@
+{% with messages = get_flashed_messages() %}
+        {% if messages %}
+        <ul>
+            {% for message in messages %}
+                {{ message }}
+            {% endfor %}
+        </ul>
+        {% endif %}
+     {% endwith %}
+{% block content %}
+<a>You can enter the mailing list by inputting your email address below:</a>
+<form action="" method="post" novalidate>
+    {{ form.hidden_tag() }}
+    <p>
+        {{ form.email(size=32) }}
+        {{ form.submit() }}
+        </br>
+        {% for error in form.email.errors %}
+            <span style="color: red;">[{{ error }}]</span>
+        {% endfor %}
+
+    </p>
+</form>
+{% endblock %}

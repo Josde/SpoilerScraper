@@ -4,7 +4,7 @@ import requests
 import requests_cache
 from sqlalchemy import orm
 from bs4 import BeautifulSoup
-from flask import Flask, render_template
+from flask import Flask, render_template, request, redirect, flash
 from requests_html import HTMLSession
 from flask_caching import Cache
 from flask_sqlalchemy import SQLAlchemy
@@ -18,18 +18,22 @@ requests_cache.install_cache(backend='memory', expire_after=300)
 cache = Cache(config={'CACHE_TYPE': 'SimpleCache', 'CACHE_DEFAULT_TIMEOUT': 300})
 app = Flask(__name__)
 cache.init_app(app)
+#Make sure we're using postgresql:// rather than postgres:// due to SQLAlchemy deprecation.
 app.config['SQLALCHEMY_DATABASE_URI'] = re.sub(r'^postgres:', 'postgresql:', os.getenv('DATABASE_URL'))
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['SECRET_KEY'] = os.getenv('SECRET_KEY')
 db = SQLAlchemy(app)
 migrate = Migrate(app, db)
 
 
-from models import Chapter
+from models import Chapter, MailingList
+from form import MailForm
+import mailing
 
-
-@app.route('/')
+@app.route('/', methods=['GET'])
 @cache.cached(timeout=300)
 def index():
+    #TODO: Split this into 2 pages to make caching work again.
     spoilerNameWG, spoilerLinkWG, isActiveWG, errorWG = scrapeWorstGen()
     spoilerNamePK, spoilerLinkPK, isActivePK, errorPK = scrapePirateKing()
     chapterNumber, chapterTitle, chapterLink, errorChapter = getChapter()
@@ -38,22 +42,93 @@ def index():
         currentBreak = "Error parsing break."
     else:
         # TODO: Add error handling for the chapter number
-        chapterNumberInt = int(chapterNumber[18:22])
-        try:
-            dbChapter = Chapter.query.filter_by(id=1).first()
-            if (dbChapter.number != chapterNumberInt):
-                #TODO: Do mail stuff here.
-                dbChapter.chapterNumber = chapterNumberInt
+        chapterNumberInt = int(chapterNumber[18:22]) if chapterNumber[18:22].isdigit() else None
+        if chapterNumberInt != None:
+            try:
+                dbChapter = Chapter.query.filter_by(id=1).first()
+                #if (dbChapter.number != chapterNumberInt):
+                if True:
+                    dbChapter.chapterNumber = chapterNumberInt
+                    db.session.commit()
+                    emailResults = MailingList.query.filter_by(validated=True).all()
+                    recipients = []
+                    for obj in emailResults:
+                        recipients.append(obj.mail)
+                    mailing.sendChapterMail(recipients, chapterNumber, chapterLink)
+            except orm.exc.NoResultFound:
+                dbChapter = Chapter(1, chapterNumber=chapterNumberInt, url=chapterLink)
+                db.session.add(dbChapter)
                 db.session.commit()
-        except orm.exc.NoResultFound:
-            dbChapter = Chapter(1, chapterNumber=chapterNumberInt, url=chapterLink)
-            db.session.add(dbChapter)
-            db.session.commit()
-
         currentBreak = scrapeBreak(str(chapterNumberInt))
     return render_template('index.html', **locals())
 
+@app.route('/mail', methods=['GET', 'POST'])
+def mail():
+    form = MailForm()
+    print(request.method)
+    if request.method == 'GET':
+        return render_template('mail.html', **locals())
+    elif request.method == 'POST':
+        if form.validate_on_submit():
+            email = request.form.get('email')
+            dbEmail = MailingList.query.filter_by(mail=email).first()
+            if (dbEmail == None):
+                dbEmail = MailingList(mail=email)
+                db.session.add(dbEmail)
+                db.session.commit()
+                print('[Mail] Successfully created database entry for mail {0}'.format(email))
+                flash('The email address {0} has been signed up. Check your inbox to verify this address.'.format(email))
+                mailing.sendVerificationMail([email], dbEmail.validation_key, deactivation=False)
+            elif (dbEmail != None and dbEmail.validated == True):
+                flash('You have successfully requested deactivation for the account {0}. Check your inbox to complete this process.'.format(dbEmail.mail))
+                print('[Mail] Successfully requested deactivation for mail {0}'.format(email))
+                mailing.sendVerificationMail([email], dbEmail.validation_key, deactivation=True)
+            else:
+                flash('It seems you have already tried to sign up with email {0}. We have resent you the validation link just in ccase.'.format(dbEmail.mail))
+                print('[Mail] Successfully requested activation for mail {0}'.format(email))
+                mailing.sendVerificationMail([email], dbEmail.validation_key, deactivation=False)
+        return redirect('/mail', code=303)
 
+@app.route('/validate', methods=['GET'])
+def validate():
+    print(request.args)
+    email = request.args.get('email')
+    uuid = request.args.get('uuid')
+    dbEmail = MailingList.query.filter_by(mail=email).first()
+    if (dbEmail == None):
+        flash('There was an error while validating your sign up for {0}. Try again.'.format(email))
+        print('[Verification] Error activating mail {0}; user doesnt exist?'.format(email))
+    else:
+        if (dbEmail.validation_key == uuid):
+            flash('Signup successful for email {0}. You can unsubscribe anytime by checking the link at the bottom of emails.'.format(email))
+            dbEmail.validated = True
+            db.session.commit()
+            print('[Verification] Success activating {0}.'.format(email))
+        else:
+            flash('There was an error while validating your sign up for {0}. Try copying the link directly from the email.'.format(email))
+            print('[Verification] Error activating {0}. UUID is {1} but should be {2}.'.format(email, uuid, dbEmail.validation_key))
+    return render_template('validate.html', **locals())
+
+@app.route('/deactivate', methods=['GET'])
+def deactivate():
+    print(request.args)
+    email = request.args.get('email')
+    uuid = request.args.get('uuid')
+    dbEmail = MailingList.query.filter_by(mail=email).first()
+    if (dbEmail == None):
+        flash('There was an error while deactivating your sign up for {0}. Try again.'.format(email))
+        print('[Deactivation] Error deactivating mail {0}; user doesnt exist?'.format(email))
+    else:
+        if (dbEmail.validation_key == uuid):
+            flash('Deactivation successful for email {0}.'.format(email))
+            dbEmail.validated = False
+            db.session.commit()
+            print('[Deactivation] Success deactivating {0}.'.format(email))
+        else:
+            print('[Deactivation] Error deactivating account {0}. UUID is {1} but should be {2}.'.format(email, uuid, dbEmail.validation_key))
+            flash('There was an error while validating your sign up for {0}. Try copying the link directly from the email.'.format(email))
+
+    return render_template('validate.html', **locals())
 if __name__ == '__main__':
     app.run()
 
