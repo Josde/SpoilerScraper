@@ -5,16 +5,16 @@ from app import db
 # This address must be verified with Amazon SES.
 SENDER = "Spoiler Notifications <spoilers@josde.me>"
 def sendChapterMail(recipients, chapterNumber, chapterLink):
-    SUBJECT = "Chapter {0} is out!".format(chapterNumber)
-    BODY_TEXT = ("Chapter {0} is out! The link is here: {1}\r\n"
+    SUBJECT = "{0} is out!".format(chapterNumber)
+    BODY_TEXT = ("{0} is out! The link is here: {1}\r\n"
      "You can unsubscribe at any moment by entering your mail in: spoilers.josde.me/mail".format(chapterNumber, chapterLink)
      )
     BODY_CONTENT = """<html>
     <head></head>
     <body>
-      <h1>Chapter {0} is out!</h1>
+      <h1>{0} is out!</h1>
       <p>The link is here:
-        <a href='{1}'>TCBScans</a> using the
+        <a href='{1}'>TCBScans</a>
       </p>
       <p>You can unsubscribe at any moment by entering your mail again in:
         <a href='https://spoilers.josde.me/mail'>spoilers.josde.me/mail</a>
