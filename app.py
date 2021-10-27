@@ -46,8 +46,7 @@ def index():
         if chapterNumberInt != None:
             try:
                 dbChapter = Chapter.query.filter_by(id=1).first()
-                #if (dbChapter.number != chapterNumberInt):
-                if True:
+                if (dbChapter.number != chapterNumberInt):
                     dbChapter.chapterNumber = chapterNumberInt
                     db.session.commit()
                     emailResults = MailingList.query.filter_by(validated=True).all()
