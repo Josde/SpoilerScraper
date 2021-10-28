@@ -37,25 +37,17 @@ def sendChapterMail(recipients, chapterNumber, chapterLink):
 def sendMail(subject, recipients, content, htmlContent, bcc=True):
     # Replace recipient@example.com with a "To" address. If your account
     # is still in the sandbox, this address must be verified.
-    if len(recipients) > 1:
-        RECIPIENTSTRING = ', '.join(recipients)
-        print()
-    elif len(recipients ) == 1:
-        RECIPIENTSTRING = recipients[0]
-    else:
+    if len(recipients) == 0:
         print("Tried to send an email with no recipient, returning.")
         return
+
     if bcc:
         destination = {
-            'BccAddresses': [
-                RECIPIENTSTRING,
-            ],
+            'BccAddresses': recipients,
         }
     else:
         destination = {
-            'ToAddresses': [
-                RECIPIENTSTRING,
-            ],
+            'ToAddresses': recipients,
         }
     # Specify a configuration set. If you do not want to use a configuration
     # set, comment the following variable, and the
