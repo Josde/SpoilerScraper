@@ -147,4 +147,4 @@ def sendVerificationMail(recipients, uuid, deactivation):
                 </body>
                 </html>
                             """.format(uuid, recipients)
-    sendMail(SUBJECT, recipients, BODY_TEXT, BODY_CONTENT, bcc=False)
+    sendMail(SUBJECT, [recipients], BODY_TEXT, BODY_CONTENT, bcc=False)

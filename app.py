@@ -77,15 +77,15 @@ def mail():
                 db.session.commit()
                 print('[Mail] Successfully created database entry for mail {0}'.format(email))
                 flash('The email address {0} has been signed up. Check your inbox to verify this address.'.format(email))
-                mailing.sendVerificationMail([email], dbEmail.validation_key, deactivation=False)
+                mailing.sendVerificationMail(email, dbEmail.validation_key, deactivation=False)
             elif (dbEmail != None and dbEmail.validated == True):
                 flash('You have successfully requested deactivation for the account {0}. Check your inbox to complete this process.'.format(dbEmail.mail))
                 print('[Mail] Successfully requested deactivation for mail {0}'.format(email))
-                mailing.sendVerificationMail([email], dbEmail.validation_key, deactivation=True)
+                mailing.sendVerificationMail(email, dbEmail.validation_key, deactivation=True)
             else:
                 flash('It seems you have already tried to sign up with email {0}. We have resent you the validation link just in ccase.'.format(dbEmail.mail))
                 print('[Mail] Successfully requested activation for mail {0}'.format(email))
-                mailing.sendVerificationMail([email], dbEmail.validation_key, deactivation=False)
+                mailing.sendVerificationMail(email, dbEmail.validation_key, deactivation=False)
         return redirect('/mail', code=303)
 
 @app.route('/validate', methods=['GET'])
