@@ -44,17 +44,17 @@ def index():
         # TODO: Add error handling for the chapter number
         chapterNumberInt = int(chapterNumber[18:22]) if chapterNumber[18:22].isdigit() else None
         if chapterNumberInt != None:
-            try:
-                dbChapter = Chapter.query.filter_by(id=1).first()
+            dbChapter = Chapter.query.filter_by(id=1).first()
+            if dbChapter != None:
                 if (dbChapter.number != chapterNumberInt):
-                    dbChapter.chapterNumber = chapterNumberInt
+                    dbChapter.number = chapterNumberInt
                     db.session.commit()
                     emailResults = MailingList.query.filter_by(validated=True).all()
                     recipients = []
                     for obj in emailResults:
                         recipients.append(obj.mail)
                     mailing.sendChapterMail(recipients, chapterNumber, chapterLink)
-            except orm.exc.NoResultFound:
+            else:
                 dbChapter = Chapter(1, chapterNumber=chapterNumberInt, url=chapterLink)
                 db.session.add(dbChapter)
                 db.session.commit()

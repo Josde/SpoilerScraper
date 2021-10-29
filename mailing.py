@@ -26,13 +26,15 @@ def sendChapterMail(recipients, chapterNumber, chapterLink):
     while len(recipients) != 0:
         currentList = []
         for n in range(0, 50):
+            #TODO: Include this in sendMail (?)
+            #Use 50 recipients for each email as it is the SES limit
             if (len(recipients)) == 0:
                 break
             currentList.append(recipients.pop(0))
         print("[Mail] Sending chapter mail to {0} recipients, {1} left.".format(len(currentList), len(recipients)))
         print('Current list is: {0}'.format(currentList))
         sendMail(SUBJECT, currentList, BODY_TEXT, BODY_CONTENT, bcc=True)
-        #TODO: Rate limiting
+        #TODO: Rate limiting, though this will work until I get atleast around 14 * 50 = 700 users.
 
 def sendMail(subject, recipients, content, htmlContent, bcc=True):
     # Replace recipient@example.com with a "To" address. If your account
