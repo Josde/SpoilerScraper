@@ -216,7 +216,7 @@ def scrapeBreak(chapterNumber):
     # Break data from ClayStage
     header = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3729.169 Safari/537.36'}
     session = HTMLSession()
-    source = session.get('https://claystage.com/one-piece-chapter-release-schedule-for-2021', headers=header).text
+    source = session.get('https://claystage.com/one-piece-chapter-release-schedule-for-2022', headers=header).text
     soup = BeautifulSoup(source, 'html.parser')
     try:
         table = soup.find('table')

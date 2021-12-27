@@ -136,7 +136,7 @@ def sendVerificationMail(recipients, uuid, deactivation):
                   <p>You have requested deactivation for the spoilers.josde.me mailing list.
                   </p>
                   <p>To verify and complete the deactivation, go to the following address: 
-                    <a href='https://spoilers.josde.me/deactivate?uuid={0}&email'>https://spoilers.josde.me/deactivate?uuid={0}&email={1}</a>
+                    <a href='https://spoilers.josde.me/deactivate?uuid={0}&email={1}'>https://spoilers.josde.me/deactivate?uuid={0}&email={1}</a>
                   </p>
                 </body>
                 </html>
