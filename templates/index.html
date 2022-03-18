@@ -11,16 +11,21 @@
     <link href="https://fonts.googleapis.com/css2?family=Roboto&display=swap" rel="stylesheet">
       <title>Spoilers</title>
      </head>
+     <body>
      <center>
     <div class="center">
-      <h1>Spoilers:</h1>
-      <a href= {{ spoilerLinkWG }}>Worstgen: {{ spoilerNameWG }} {{ isActiveWG }} {{ errorWG }}</a>
-      <br><a href= {{ spoilerLinkPK }}>Pirate-King: {{ spoilerNamePK }} {{ isActivePK }} {{ errorPK }}</a>
-      <h1>Latest chapter:</h1>
-      <a href={{ chapterLink }}>{{ chapterNumber }}: {{ chapterTitle }} {{ chapterError }}</a>
-      <h1>Break: </h1>
-      <a href="https://claystage.com/one-piece-chapter-release-schedule-for-2021">ClayStage: {{ currentBreak }}</a>
-     </div>
+        <div id="contenido">
+            <div id="contenidoHolder">
+                 <h1>Spoilers:</h1>
+                  <a href= {{ spoilerLinkWG }}>Worstgen: {{ spoilerNameWG }} {{ isActiveWG }} {{ errorWG }}</a>
+                  <br><a href= {{ spoilerLinkPK }}>Pirate-King: {{ spoilerNamePK }} {{ isActivePK }} {{ errorPK }}</a>
+                  <h1>Latest chapter:</h1>
+                  <a href={{ chapterLink }}>{{ chapterNumber }}: {{ chapterTitle }} {{ chapterError }}</a>
+                  <h1>Break: </h1>
+                  <a href="https://claystage.com/one-piece-chapter-release-schedule-for-2021">ClayStage: {{ currentBreak }}</a>
+                 </div>
+            </div>
+        </div>
      <div class="bottom">
         <a>Do you want to always get the latest updates? Check out the mailing list</a><a href={{ url_for('mail') }}>here.</a>
      </div>

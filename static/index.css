@@ -1,6 +1,38 @@
+.center {
+    margin-top: auto;
+    display:flex;
+    flex-direction:column;
+    vertical-align:center;
+    text-align:center;
+    justify-content: center;
+    align-items: center;
+    horiz-align:center;
+    font-family: 'Roboto Mono', monospace;
+    font-weight: bolder;
+    color: rgb(214, 214, 214);
+}
+
+
+h1 {
+    background-color:#1b1b1b;
+    border-radius: 20px;
+    color: white;
+    background-size: cover;
+    margin: 5px;
+    padding: 5px;
+}
+
+a {
+    margin: 5px;
+}
+
+
 html {
-  background: url("res/bg.png");
-  background-repeat: repeat;
+  background-color: rgb(46, 46, 46);
+  -webkit-background-size: cover;
+  -moz-background-size: cover;
+  -o-background-size: cover;
+  background-size: cover;
 }
 body {
     display: flex;
@@ -8,27 +40,39 @@ body {
     align-items: center;
     flex-direction:column;
     min-height: 100vh;
-    font-family: 'Roboto', sans-serif;
-
+    font-family: 'Roboto Mono', monospace;
+    color: rgb(214, 214, 214);
 }
 
-.center {
-    background-color:rgba(255, 255, 255, 1);
-    margin-top: auto;
-    border: 2px solid #1b1b1b;
+#contenido {
+    background-color:rgba(64, 64, 64);
+    border-radius:20px;
+}
+.bottom {
+    margin-top: 40vh;
     display:flex;
     flex-direction:column;
-    vertical-align:center;
+    vertical-align:bottom;
+    justify-content: center;
+    align-items: center;
     horiz-align:center;
+
+    font-size: 12px;
+}
+#title {
+    font-family: 'Bebas Neue', cursive;
+    font-size: 36px;
+    /*font-family: 'Roboto Mono', monospace;*/
 }
 
-h1 {
-    background-color:#1b1b1b;
-    color: white;
-    background-size: cover;
-    margin: 5px;
+a:link {
+  color: rgb(108, 153, 187);
+  background-color: transparent;
+  text-decoration: none;
 }
 
-a {
-    margin: 3px;
+a:visited {
+  color: rgb(158, 134, 200);
+  background-color: transparent;
+  text-decoration: none;
 }
