@@ -1,7 +1,9 @@
+import asyncio
 import traceback
 
 import requests
 import requests_cache
+from aiohttp import ClientSession
 from sqlalchemy import orm
 from bs4 import BeautifulSoup
 from flask import Flask, render_template, request, redirect, flash
@@ -12,6 +14,9 @@ from flask_migrate import Migrate
 import os
 from dotenv import load_dotenv
 import re
+import aiohttp
+import nest_asyncio
+nest_asyncio.apply()
 load_dotenv()
 #TODO: Implement something like CacheControl to prevent many requests being made if the page is reloaded.
 requests_cache.install_cache(backend='memory', expire_after=300)
@@ -31,12 +36,20 @@ from form import MailForm
 import mailing
 
 @app.route('/', methods=['GET'])
-@cache.cached(timeout=300)
-def index():
-    #TODO: Split this into 2 pages to make caching work again.
-    spoilerNameWG, spoilerLinkWG, isActiveWG, errorWG = scrapeWorstGen()
-    spoilerNamePK, spoilerLinkPK, isActivePK, errorPK = scrapePirateKing()
-    chapterNumber, chapterTitle, chapterLink, errorChapter = getChapter()
+
+async def index():
+    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3729.169 Safari/537.36'}
+    timeout = aiohttp.ClientTimeout(total=10)
+    #TODO: Migrate all functions to async and aiohttp
+    asyncio.set_event_loop(asyncio.new_event_loop())
+    loop = asyncio.get_event_loop()
+
+    async with aiohttp.ClientSession(headers=headers, timeout=timeout) as session:
+        tasks = [scrapeWorstGen(session), scrapePirateKing(session), getChapter(session)]
+        resultsWG, resultsPK, resultsTCB = loop.run_until_complete(asyncio.gather(*tasks))
+        spoilerNameWG, spoilerLinkWG, isActiveWG, errorWG  = resultsWG
+        spoilerNamePK, spoilerLinkPK, isActivePK, errorPK = resultsPK
+        chapterNumber, chapterTitle, chapterLink, errorChapter = resultsTCB
 
     if (errorChapter != ""):
         currentBreak = "Error parsing break."
@@ -58,7 +71,8 @@ def index():
                 dbChapter = Chapter(1, chapterNumber=chapterNumberInt, url=chapterLink)
                 db.session.add(dbChapter)
                 db.session.commit()
-        currentBreak = scrapeBreak(str(chapterNumberInt))
+        async with aiohttp.ClientSession(headers=headers, timeout=timeout) as session:
+            currentBreak = await scrapeBreak(str(chapterNumberInt), session)
     return render_template('index.html', **locals())
 
 @app.route('/mail', methods=['GET', 'POST'])
@@ -131,14 +145,11 @@ def deactivate():
 if __name__ == '__main__':
     app.run()
 
-def scrapeWorstGen():
+async def scrapeWorstGen(asyncio_session: aiohttp.ClientSession):
     spoilerName = spoilerLink = isActive = error = ""
-    try:
-        source = requests.get('https://worstgen.alwaysdata.net/forum/forums/one-piece-spoilers.14/', timeout=5.000).text
-    except requests.exceptions.Timeout:
-        print(traceback.format_exc())
-        error = "Site down."
-        return spoilerName, spoilerLink, isActive, error
+    print('Scraping WorstGen')
+    async with asyncio_session.get('https://worstgen.alwaysdata.net/forum/forums/one-piece-spoilers.14/') as response:
+        source = await response.text()
     try:
         soup = BeautifulSoup(source, 'html.parser')
         for thread in soup.find_all('div', {'class': {'structItem-title'}}):
@@ -164,16 +175,14 @@ def scrapeWorstGen():
         print(traceback.format_exc())
         error = "Error parsing spoilers."
         return spoilerName, spoilerLink, isActive, error
+    print('WorstGen done')
     return spoilerName, spoilerLink, isActive, error
 
-def scrapePirateKing():
+async def scrapePirateKing(asyncio_session : aiohttp.ClientSession):
+    print('Scraping Pirateking')
     spoilerName = spoilerLink = isActive = error = ""
-    try:
-        source = requests.get('https://www.pirate-king.es/foro/one-piece-manga-f3.html', timeout=5.000).text
-    except requests.exceptions.Timeout:
-        print(traceback.format_exc())
-        error = "Site down."
-        return spoilerName, spoilerLink, isActive, error
+    async with asyncio_session.get('https://www.pirate-king.es/foro/one-piece-manga-f3.html') as response:
+        source = await response.text()
     try:
         soup = BeautifulSoup(source, 'html.parser')
         isActive = ""
@@ -188,16 +197,15 @@ def scrapePirateKing():
         error = "Error parsing spoilers."
         return spoilerName, spoilerLink, isActive, error
     #TODO: Figure out a way to parse if spoilers are up here. Since Redon is a moderator, the edit message doesn't show on his posts.
+    print('Pirateking done')
     return spoilerName, spoilerLink, isActive, error
 
-def getChapter():
+async def getChapter(asyncio_session : aiohttp.ClientSession):
     chapterNumber = chapterTitle = chapterLink = error = ""
+    print('Scraping TCB')
+    async with asyncio_session.get('https://onepiecechapters.com/mangas/5/one-piece') as response:
+        source = await response.text()
     #TODO: Redirect to M+ when chapter is released officially.
-    try:
-        source = requests.get('https://onepiecechapters.com/mangas/5/one-piece', timeout=5.000).text
-    except requests.exceptions.Timeout:
-        error = "Site down."
-        return chapterNumber, chapterTitle, chapterLink, error
     try:
         soup = BeautifulSoup(source, 'html.parser')
         # Latest chapter is always at the top, therefore first box is the latest chapter.
@@ -210,13 +218,13 @@ def getChapter():
         print(traceback.format_exc())
         error = "Error parsing chapter."
         return chapterNumber, chapterTitle, chapterLink, error
+    print('TCB Done')
     return chapterNumber, chapterTitle, chapterLink, error
 
-def scrapeBreak(chapterNumber):
+async def scrapeBreak(chapterNumber, asyncio_session: ClientSession):
     # Break data from ClayStage
-    header = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3729.169 Safari/537.36'}
-    session = HTMLSession()
-    source = session.get('https://claystage.com/one-piece-chapter-release-schedule-for-2022', headers=header).text
+    async with asyncio_session.get('https://claystage.com/one-piece-chapter-release-schedule-for-2022') as response:
+        source = await response.text()
     soup = BeautifulSoup(source, 'html.parser')
     try:
         table = soup.find('table')
