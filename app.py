@@ -1,6 +1,7 @@
 import asyncio
+import datetime
 import traceback
-from datetime import time
+from datetime import datetime
 
 import requests
 import requests_cache
@@ -236,7 +237,7 @@ async def scrape_task():
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3729.169 Safari/537.36'}
     timeout = aiohttp.ClientTimeout(total=10)
     # TODO: Migrate all functions to async and aiohttp
-    print('[{0}] Starting scraping'.format(time()))
+    print('[{0}] Starting scraping'.format(datetime.now()))
     global _resultsWG, _resultsPK, _resultsTCB, _currentBreak
     async with aiohttp.ClientSession(headers=headers, timeout=timeout) as session:
         tasks = [scrapeWorstGen(session), scrapePirateKing(session), getChapter(session)]
