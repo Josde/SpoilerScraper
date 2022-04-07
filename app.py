@@ -3,14 +3,10 @@ import datetime
 import traceback
 from datetime import datetime
 
-import requests
-import requests_cache
 from aiohttp import ClientSession
 from sqlalchemy import orm
 from bs4 import BeautifulSoup
 from flask import Flask, render_template, request, redirect, flash
-from requests_html import HTMLSession
-from flask_caching import Cache
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 import os
@@ -23,10 +19,7 @@ import threading
 nest_asyncio.apply()
 load_dotenv()
 #TODO: Implement something like CacheControl to prevent many requests being made if the page is reloaded.
-requests_cache.install_cache(backend='memory', expire_after=300)
-cache = Cache(config={'CACHE_TYPE': 'SimpleCache', 'CACHE_DEFAULT_TIMEOUT': 300})
 app = Flask(__name__)
-cache.init_app(app)
 #Make sure we're using postgresql:// rather than postgres:// due to SQLAlchemy deprecation.
 app.config['SQLALCHEMY_DATABASE_URI'] = re.sub(r'^postgres:', 'postgresql:', os.getenv('DATABASE_URL'))
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
@@ -132,7 +125,7 @@ async def scrapeWorstGen(asyncio_session: aiohttp.ClientSession):
                 spoilerLink = threadTitle['href']
                 break;
         # Scrape the thread and use post count to tell if spoilers are up (no replies will be made until spoilers are up, usually)
-        currentThread = requests.get(spoilerLink).text
+        currentThread = await asyncio_session.get(spoilerLink).text
         threadSoup = BeautifulSoup(currentThread, 'html.parser')
         posts = threadSoup.find_all('div', {'class': {'message-cell message-cell--main'}})
         count = len(posts)
