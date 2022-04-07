@@ -238,9 +238,10 @@ async def scrape_task():
     timeout = aiohttp.ClientTimeout(total=10)
     # TODO: Migrate all functions to async and aiohttp
     loop = asyncio.get_event_loop()
-    print('[{0}] Starting scraping'.format(datetime.now()))
+
     global _resultsWG, _resultsPK, _resultsTCB, _currentBreak
     while True:
+        print('[{0}] Starting scraping'.format(datetime.now()))
         async with aiohttp.ClientSession(headers=headers, timeout=timeout) as session:
             tasks = [scrapeWorstGen(session), scrapePirateKing(session), getChapter(session)]
             _resultsWG, _resultsPK, _resultsTCB = loop.run_until_complete(asyncio.gather(*tasks))
