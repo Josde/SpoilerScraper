@@ -123,7 +123,7 @@ async def scrapeWorstGen(asyncio_session: aiohttp.ClientSession):
             if "Summaries" in threadTitle.text:
                 spoilerName = threadTitle.text
                 spoilerLink = threadTitle['href']
-                break;
+                break
         # Scrape the thread and use post count to tell if spoilers are up (no replies will be made until spoilers are up, usually)
         currentThread = await asyncio_session.get(spoilerLink).text
         threadSoup = BeautifulSoup(currentThread, 'html.parser')
@@ -156,7 +156,7 @@ async def scrapePirateKing(asyncio_session : aiohttp.ClientSession):
             if "Spoilers" in thread.text:
                 # Latest spoiler threads are always pinned; therefore the first thread with "spoilers" in title is the one for the current chapter.
                 spoilerLink = thread['href']
-                spoilerName = thread.text
+                spoilerName = thread.text()
                 break;
     except AttributeError:
         print(traceback.format_exc())
