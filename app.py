@@ -1,5 +1,6 @@
 import asyncio
 import traceback
+from datetime import time
 
 import requests
 import requests_cache
@@ -16,6 +17,8 @@ from dotenv import load_dotenv
 import re
 import aiohttp
 import nest_asyncio
+import threading
+
 nest_asyncio.apply()
 load_dotenv()
 #TODO: Implement something like CacheControl to prevent many requests being made if the page is reloaded.
@@ -29,50 +32,20 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY')
 db = SQLAlchemy(app)
 migrate = Migrate(app, db)
-
-
 from models import Chapter, MailingList
 from form import MailForm
 import mailing
+_resultsWG = _resultsPK = _resultsTCB = _currentBreak = None
 
 @app.route('/', methods=['GET'])
-
 async def index():
-    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3729.169 Safari/537.36'}
-    timeout = aiohttp.ClientTimeout(total=10)
-    #TODO: Migrate all functions to async and aiohttp
-    asyncio.set_event_loop(asyncio.new_event_loop())
-    loop = asyncio.get_event_loop()
-
-    async with aiohttp.ClientSession(headers=headers, timeout=timeout) as session:
-        tasks = [scrapeWorstGen(session), scrapePirateKing(session), getChapter(session)]
-        resultsWG, resultsPK, resultsTCB = loop.run_until_complete(asyncio.gather(*tasks))
-        spoilerNameWG, spoilerLinkWG, isActiveWG, errorWG  = resultsWG
-        spoilerNamePK, spoilerLinkPK, isActivePK, errorPK = resultsPK
-        chapterNumber, chapterTitle, chapterLink, errorChapter = resultsTCB
-
-    if (errorChapter != ""):
-        currentBreak = "Error parsing break."
-    else:
-        # TODO: Add error handling for the chapter number
-        chapterNumberInt = int(chapterNumber[18:22]) if chapterNumber[18:22].isdigit() else None
-        if chapterNumberInt != None:
-            dbChapter = Chapter.query.filter_by(id=1).first()
-            if dbChapter != None:
-                if (dbChapter.number != chapterNumberInt):
-                    dbChapter.number = chapterNumberInt
-                    db.session.commit()
-                    emailResults = MailingList.query.filter_by(validated=True).all()
-                    recipients = []
-                    for obj in emailResults:
-                        recipients.append(obj.mail)
-                    mailing.sendChapterMail(recipients, chapterNumber, chapterLink)
-            else:
-                dbChapter = Chapter(1, chapterNumber=chapterNumberInt, url=chapterLink)
-                db.session.add(dbChapter)
-                db.session.commit()
-        async with aiohttp.ClientSession(headers=headers, timeout=timeout) as session:
-            currentBreak = await scrapeBreak(str(chapterNumberInt), session)
+    while _resultsWG is None or _resultsPK is None or _resultsTCB is None or _currentBreak is None:
+        print('Waiting for parsing to be done.')
+        await asyncio.sleep(0.5)
+    spoilerNameWG, spoilerLinkWG, isActiveWG, errorWG = _resultsWG
+    spoilerNamePK, spoilerLinkPK, isActivePK, errorPK = _resultsPK
+    chapterNumber, chapterTitle, chapterLink, errorChapter = _resultsTCB
+    currentBreak = _currentBreak
     return render_template('index.html', **locals())
 
 @app.route('/mail', methods=['GET', 'POST'])
@@ -142,8 +115,7 @@ def deactivate():
             flash('There was an error while validating your sign up for {0}. Try copying the link directly from the email.'.format(email))
 
     return render_template('validate.html', **locals())
-if __name__ == '__main__':
-    app.run()
+
 
 async def scrapeWorstGen(asyncio_session: aiohttp.ClientSession):
     spoilerName = spoilerLink = isActive = error = ""
@@ -223,6 +195,7 @@ async def getChapter(asyncio_session : aiohttp.ClientSession):
 
 async def scrapeBreak(chapterNumber, asyncio_session: ClientSession):
     # Break data from ClayStage
+    print('Scraping break')
     async with asyncio_session.get('https://claystage.com/one-piece-chapter-release-schedule-for-2022') as response:
         source = await response.text()
     soup = BeautifulSoup(source, 'html.parser')
@@ -254,5 +227,55 @@ async def scrapeBreak(chapterNumber, asyncio_session: ClientSession):
             else:
                 breakType += " and then {0}".format(text)
 
-
+    print('Break done')
     return breakType
+
+
+async def scrape_task():
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3729.169 Safari/537.36'}
+    timeout = aiohttp.ClientTimeout(total=10)
+    # TODO: Migrate all functions to async and aiohttp
+    print('[{0}] Starting scraping'.format(time()))
+    global _resultsWG, _resultsPK, _resultsTCB, _currentBreak
+    async with aiohttp.ClientSession(headers=headers, timeout=timeout) as session:
+        tasks = [scrapeWorstGen(session), scrapePirateKing(session), getChapter(session)]
+        _resultsWG, _resultsPK, _resultsTCB = loop.run_until_complete(asyncio.gather(*tasks))
+        chapterNumber, chapterTitle, chapterLink, errorChapter = _resultsTCB
+        if (errorChapter != ''):
+            currentBreak = "Error parsing break."
+        else:
+            # TODO: Add error handling for the chapter number
+            chapterNumberInt = int(chapterNumber[18:22]) if chapterNumber[18:22].isdigit() else None
+            if chapterNumberInt != None:
+                dbChapter = Chapter.query.filter_by(id=1).first()
+                if dbChapter != None:
+                    if (dbChapter.number != chapterNumberInt):
+                        dbChapter.number = chapterNumberInt
+                        db.session.commit()
+                        emailResults = MailingList.query.filter_by(validated=True).all()
+                        recipients = []
+                        for obj in emailResults:
+                            recipients.append(obj.mail)
+                        mailing.sendChapterMail(recipients, chapterNumber, chapterLink)
+                else:
+                    dbChapter = Chapter(1, chapterNumber=chapterNumberInt, url=chapterLink)
+                    db.session.add(dbChapter)
+                    db.session.commit()
+            async with aiohttp.ClientSession(headers=headers, timeout=timeout) as session:
+                _currentBreak = await scrapeBreak(str(chapterNumberInt), session)
+    await asyncio.sleep(300)
+
+
+def loop_in_thread(loop):
+    asyncio.set_event_loop(loop)
+    loop.run_until_complete(scrape_task())
+
+# THIS RUNS ON STARTUP, IT IS ONLY DOWN HERE DUE TO NAMING ERRORS!!!
+# FIXME: Hacky af, refactor this
+loop = asyncio.get_event_loop()
+t = threading.Thread(target=loop_in_thread, args=(loop,))
+t.start()
+
+if __name__ == '__main__':
+    app.run()
