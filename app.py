@@ -15,6 +15,9 @@ import re
 import aiohttp
 import nest_asyncio
 import threading
+from datetime import datetime
+from wsgiref.handlers import format_date_time
+from time import mktime
 
 nest_asyncio.apply()
 load_dotenv()
@@ -31,6 +34,7 @@ from form import MailForm
 import mailing
 _resultsWG = _resultsPK = _resultsTCB = _currentBreak = None
 TIME_BETWEEN_UPDATES_MINS = 5
+_last_modified_stamp = mktime(datetime.now().timetuple())
 @app.before_first_request
 def start_scraping_loop():
     t = threading.Thread(target=loop_in_thread, args=())
@@ -40,6 +44,8 @@ def add_header(response):
     response.cache_control.max_age = 300
     response.cache_control.public = True
     response.cache_control.must_revalidate = True
+    response.headers['Last-Modified'] = format_date_time(_last_modified_stamp)
+    response.add_etag()
     return response
 
 @app.route('/', methods=['GET'])
@@ -244,7 +250,7 @@ async def scrape_task():
     # TODO: Migrate all functions to async and aiohttp
     loop = asyncio.get_event_loop()
 
-    global _resultsWG, _resultsPK, _resultsTCB, _currentBreak
+    global _resultsWG, _resultsPK, _resultsTCB, _currentBreak, _last_modified_stamp
     while True:
         print('[{0}] Starting scraping'.format(datetime.now()))
         async with aiohttp.ClientSession(headers=headers, timeout=timeout) as session:
@@ -273,6 +279,7 @@ async def scrape_task():
                         db.session.commit()
                 async with aiohttp.ClientSession(headers=headers, timeout=timeout) as session:
                     _currentBreak = await scrapeBreak(str(chapterNumberInt), session)
+        _last_modified_stamp = mktime(datetime.now().timetuple())
         await asyncio.sleep(TIME_BETWEEN_UPDATES_MINS * 60)
 
 
