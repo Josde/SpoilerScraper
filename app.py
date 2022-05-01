@@ -35,7 +35,12 @@ TIME_BETWEEN_UPDATES_MINS = 5
 def start_scraping_loop():
     t = threading.Thread(target=loop_in_thread, args=())
     t.start()
-
+@app.after_request
+def add_header(response):
+    response.cache_control.max_age = 300
+    response.cache_control.public = True
+    response.cache_control.must_revalidate = True
+    return response
 
 @app.route('/', methods=['GET'])
 async def index():
