@@ -41,6 +41,8 @@ def start_scraping_loop():
     t.start()
 @app.after_request
 def add_header(response):
+    # fixes werkzeug > 0.9 etag error
+    response.direct_passthrough = False
     response.cache_control.max_age = 300
     response.cache_control.public = True
     response.cache_control.must_revalidate = True
