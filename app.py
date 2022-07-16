@@ -21,6 +21,7 @@ from time import mktime
 
 nest_asyncio.apply()
 load_dotenv()
+#TODO: Run flask migrations again due to change to VSCode // local idk
 #TODO: Implement something like CacheControl to prevent many requests being made if the page is reloaded.
 app = Flask(__name__)
 #Make sure we're using postgresql:// rather than postgres:// due to SQLAlchemy deprecation.
@@ -167,7 +168,7 @@ async def scrapeWorstGen(asyncio_session: aiohttp.ClientSession):
 async def scrapePirateKing(asyncio_session : aiohttp.ClientSession):
     print('Scraping Pirateking')
     spoilerName = spoilerLink = isActive = error = ""
-    async with asyncio_session.get('https://www.pirate-king.es/foro/one-piece-manga-f3.html') as response:
+    async with asyncio_session.get('https://pirate-king.es/foro/viewforum.php?f=3') as response:
         source = await response.text()
     try:
         soup = BeautifulSoup(source, 'html.parser')
