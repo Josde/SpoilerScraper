@@ -55,11 +55,11 @@ def add_header(response):
 async def index():
     while _resultsWG is None or _resultsPK is None or _resultsTCB is None or _currentBreak is None: # I know I should implement a mutex here but I'm lazy.
         print('Waiting for parsing to be done.')
-        await asyncio.sleep(0.1)
+        await asyncio.sleep(0.5)
     spoilerNameWG, spoilerLinkWG, isActiveWG, errorWG = _resultsWG
     spoilerNamePK, spoilerLinkPK, isActivePK, errorPK = _resultsPK
     chapterNumber, chapterTitle, chapterLink, errorChapter = _resultsTCB
-    currentBreak = _currentBreak
+    currentBreak, breakError = _currentBreak, _breakError
     return render_template('index.html', **locals())
 
 @app.route('/mail', methods=['GET', 'POST'])
@@ -132,33 +132,30 @@ def deactivate():
 
 
 async def scrapeWorstGen(asyncio_session: aiohttp.ClientSession):
-    spoilerName = spoilerLink = isActive = error = ""
+    spoilerName = spoilerLink = error = ""
+    isActive = None
     print('Scraping WorstGen')
-    async with asyncio_session.get('https://worstgen.alwaysdata.net/forum/forums/one-piece-spoilers.14/') as response:
-        source = await response.text()
     try:
-        soup = BeautifulSoup(source, 'html.parser')
-        for thread in soup.find_all('div', {'class': {'structItem-title'}}):
-            threadTitle = thread.findChildren('a')[1]
-            if "Summaries" in threadTitle.text:
-                spoilerName = threadTitle.text
-                spoilerLink = threadTitle['href']
-                break
-        # Scrape the thread and use post count to tell if spoilers are up (no replies will be made until spoilers are up, usually)
-        currentThreadResponse = await asyncio_session.get(spoilerLink)
-        currentThread = await currentThreadResponse.text()
-        threadSoup = BeautifulSoup(currentThread, 'html.parser')
-        posts = threadSoup.find_all('div', {'class': {'message-cell message-cell--main'}})
-        count = len(posts)
-        if count > 1:
-            if count < 20:
-                isActive = "(ACTIVE, {0} POSTS)".format(count)
+        async with asyncio_session.get('https://worstgen.alwaysdata.net/forum/forums/one-piece-spoilers.14/') as response:
+            source = await response.text()
+            soup = BeautifulSoup(source, 'html.parser')
+            for thread in soup.find_all('div', {'class': {'structItem-title'}}):
+                threadTitle = thread.findChildren('a')[1]
+                if "Summaries" in threadTitle.text:
+                    spoilerName = threadTitle.text
+                    spoilerLink = threadTitle['href']
+                    break
+            # Scrape the thread and use post count to tell if spoilers are up (no replies will be made until spoilers are up, usually)
+            currentThreadResponse = await asyncio_session.get(spoilerLink)
+            currentThread = await currentThreadResponse.text()
+            threadSoup = BeautifulSoup(currentThread, 'html.parser')
+            posts = threadSoup.find_all('div', {'class': {'message-cell message-cell--main'}})
+            count = len(posts)
+            if count > 1:
+                isActive = True
             else:
-                #TODO: If thread has more than 20 posts, we should recursively parse the next pages to get all posts. Too lazy for that rn.
-                isActive = "(ACTIVE, {0}+ POSTS)".format(count)
-        else:
-            isActive = "(INACTIVE)"
-    except AttributeError: #BeautifulSoup element not found
+                isActive = False
+    except Exception: #BeautifulSoup element not found
         print(traceback.format_exc())
         error = "Error parsing spoilers."
         return spoilerName, spoilerLink, isActive, error
@@ -168,18 +165,19 @@ async def scrapeWorstGen(asyncio_session: aiohttp.ClientSession):
 async def scrapePirateKing(asyncio_session : aiohttp.ClientSession):
     print('Scraping Pirateking')
     spoilerName = spoilerLink = isActive = error = ""
-    async with asyncio_session.get('https://pirate-king.es/foro/viewforum.php?f=3') as response:
-        source = await response.text()
     try:
-        soup = BeautifulSoup(source, 'html.parser')
-        isActive = ""
-        for thread in soup.find_all('a', {'class': 'topictitle'}):
-            if "Spoilers" in thread.text:
-                # Latest spoiler threads are always pinned; therefore the first thread with "spoilers" in title is the one for the current chapter.
-                spoilerLink = thread['href']
-                spoilerName = thread.text
-                break;
-    except AttributeError:
+        async with asyncio_session.get('https://pirate-king.es/foro/viewforum.php?f=3') as response:
+            source = await response.text()
+        
+            soup = BeautifulSoup(source, 'html.parser')
+            isActive = ""
+            for thread in soup.find_all('a', {'class': 'topictitle'}):
+                if "Spoilers" in thread.text:
+                    # Latest spoiler threads are always pinned; therefore the first thread with "spoilers" in title is the one for the current chapter.
+                    spoilerLink = thread['href']
+                    spoilerName = thread.text
+                    break;
+    except Exception:
         print(traceback.format_exc())
         error = "Error parsing spoilers."
         return spoilerName, spoilerLink, isActive, error
@@ -190,18 +188,18 @@ async def scrapePirateKing(asyncio_session : aiohttp.ClientSession):
 async def getChapter(asyncio_session : aiohttp.ClientSession):
     chapterNumber = chapterTitle = chapterLink = error = ""
     print('Scraping TCB')
-    async with asyncio_session.get('https://onepiecechapters.com/mangas/5/one-piece') as response:
-        source = await response.text()
-    #TODO: Redirect to M+ when chapter is released officially.
     try:
-        soup = BeautifulSoup(source, 'html.parser')
-        # Latest chapter is always at the top, therefore first box is the latest chapter.
-        chapter = soup.find('a', {'class': 'block border border-border bg-card mb-3 p-3 rounded'})
-        # IMPROVEMENT: I could use regex to split this, but this will work until we get to Chapter 10000, so whatever.
-        chapterNumber = chapter.findChild('div', {'class': 'text-lg font-bold'}).text
-        chapterTitle = chapter.findChild('div', {'class': 'text-gray-500'}).text
-        chapterLink = "https://onepiecechapters.com" + chapter['href']
-    except AttributeError:
+        async with asyncio_session.get('https://onepiecechapters.com/mangas/5/one-piece') as response:
+            source = await response.text()
+        #TODO: Redirect to M+ when chapter is released officially.
+            soup = BeautifulSoup(source, 'html.parser')
+            # Latest chapter is always at the top, therefore first box is the latest chapter.
+            chapter = soup.find('a', {'class': 'block border border-border bg-card mb-3 p-3 rounded'})
+            # IMPROVEMENT: I could use regex to split this, but this will work until we get to Chapter 10000, so whatever.
+            chapterNumber = chapter.findChild('div', {'class': 'text-lg font-bold'}).text
+            chapterTitle = chapter.findChild('div', {'class': 'text-gray-500'}).text
+            chapterLink = "https://onepiecechapters.com" + chapter['href']
+    except Exception:
         print(traceback.format_exc())
         error = "Error parsing chapter."
         return chapterNumber, chapterTitle, chapterLink, error
@@ -210,18 +208,18 @@ async def getChapter(asyncio_session : aiohttp.ClientSession):
 
 async def scrapeBreak(chapterNumber, asyncio_session: ClientSession):
     # Break data from ClayStage
+    breakType = error = ""
     print('Scraping break')
-    async with asyncio_session.get('https://claystage.com/one-piece-chapter-release-schedule-for-2022') as response:
-        source = await response.text()
-    soup = BeautifulSoup(source, 'html.parser')
     try:
-        table = soup.find('table')
-        table_body = table.find('tbody')
+        async with asyncio_session.get('https://claystage.com/one-piece-chapter-release-schedule-for-2022') as response:
+            source = await response.text()
+            soup = BeautifulSoup(source, 'html.parser')
+            table = soup.find('table')
+            table_body = table.find('tbody')
     except Exception:
         print(traceback.format_exc())
-        print(soup)
-        breakType = "There was an error parsing break data."
-        return breakType
+        error = "Error"
+        return breakType, error
 
     breakType = "After Chapter {0}, there is ".format(chapterNumber)
 
@@ -243,7 +241,7 @@ async def scrapeBreak(chapterNumber, asyncio_session: ClientSession):
                 breakType += " and then {0}".format(text)
 
     print('Break done')
-    return breakType
+    return breakType, error
 
 
 async def scrape_task():
@@ -253,15 +251,18 @@ async def scrape_task():
     # TODO: Migrate all functions to async and aiohttp
     loop = asyncio.get_event_loop()
 
-    global _resultsWG, _resultsPK, _resultsTCB, _currentBreak, _last_modified_stamp
+    global _resultsWG, _resultsPK, _resultsTCB, _currentBreak, _breakError, _last_modified_stamp
     while True:
         print('[{0}] Starting scraping'.format(datetime.now()))
         async with aiohttp.ClientSession(headers=headers, timeout=timeout) as session:
-            tasks = [scrapeWorstGen(session), scrapePirateKing(session), getChapter(session)]
-            _resultsWG, _resultsPK, _resultsTCB = loop.run_until_complete(asyncio.gather(*tasks))
-            chapterNumber, chapterTitle, chapterLink, errorChapter = _resultsTCB
+            try:
+                tasks = [scrapeWorstGen(session), scrapePirateKing(session), getChapter(session)]
+                _resultsWG, _resultsPK, _resultsTCB = loop.run_until_complete(asyncio.gather(*tasks))
+                chapterNumber, chapterTitle, chapterLink, errorChapter = _resultsTCB
+            except Exception:
+                traceback.print_exc()
             if (errorChapter != ''):
-                currentBreak = "Error parsing break."
+                _breakError = "Error parsing break."
             else:
                 # TODO: Add error handling for the chapter number
                 chapterNumberInt = int(chapterNumber[18:22]) if chapterNumber[18:22].isdigit() else None
@@ -281,7 +282,10 @@ async def scrape_task():
                         db.session.add(dbChapter)
                         db.session.commit()
                 async with aiohttp.ClientSession(headers=headers, timeout=timeout) as session:
-                    _currentBreak = await scrapeBreak(str(chapterNumberInt), session)
+                    try:
+                        _currentBreak, _breakError = await scrapeBreak(str(chapterNumberInt), session)
+                    except Exception:
+                        traceback.print_exc()
         _last_modified_stamp = mktime(datetime.now().timetuple())
         await asyncio.sleep(TIME_BETWEEN_UPDATES_MINS * 60)
 

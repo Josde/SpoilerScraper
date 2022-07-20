@@ -19,13 +19,29 @@
             <div id="contenido">
                 <div id="contenidoHolder">
                      <h1>Spoilers:</h1>
-                      <a href= {{ spoilerLinkWG }}>Worstgen: {{ spoilerNameWG }} {{ isActiveWG }} {{ errorWG }}</a>
-                      <br><a href= {{ spoilerLinkPK }}>Pirate-King: {{ spoilerNamePK }} {{ isActivePK }} {{ errorPK }}</a>
+                      {% if errorWG == "" and isActiveWG == True %}
+                      <a href= {{ spoilerLinkWG }}>Worstgen: {{ spoilerNameWG }}</a>
+                      {% else %}
+                      <b>WorstGen is down or has no spoilers.</b>
+                      {% endif %}
+                      {% if errorPK == "" %}
+                      <br><a href= {{ spoilerLinkPK }}>Pirate-King: {{ spoilerNamePK }} {{ isActivePK }}</a>
+                      {% else %}
+                      <br><b>Pirate-King is down or has no spoilers.</b>
+                      {% endif %}
                       <h1>Latest chapter:</h1>
-                      <a href={{ chapterLink }}>{{ chapterNumber }}: {{ chapterTitle }} {{ chapterError }}</a>
+                      {% if errorChapter == "" %}
+                      <a href={{ chapterLink }}>{{ chapterNumber }}: {{ chapterTitle }}</a>
+                      {% else %}
+                      <b>Error parsing chapter.</b>
+                      {% endif %}
+                      {% if breakError == "" %}
                       <h1>Break: </h1>
                       <a href="https://claystage.com/one-piece-chapter-release-schedule-for-2022">ClayStage: {{ currentBreak }}</a>
-                     </div>
+                      {% else %}
+                      <b>Error parsing break data.</b>
+                      {% endif %} 
+                    </div>
                 </div>
             </div>
          <div class="bottom">
